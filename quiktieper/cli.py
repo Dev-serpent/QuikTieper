@@ -3,14 +3,14 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from quiktieper.bindings import parse_bindings
 from quiktieper.config import DEFAULT_CONFIG_PATH, ensure_config, load_config
-from quiktieper.launcher import Binding
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="quiktieper",
-        description="Launch apps using simultaneous key chords.",
+        description="Launch apps and focused-app shortcuts using simultaneous key chords.",
     )
     parser.add_argument(
         "--config",
@@ -38,20 +38,16 @@ def main() -> None:
         return
 
     config = load_config(args.config)
-    bindings = [
-        Binding(
-            name=item["name"],
-            keys=frozenset(key.lower() for key in item["keys"]),
-            command=item.get("cmd") or item["command"],
-            cooldown_seconds=float(item.get("cooldown_seconds", 0.8)),
-        )
-        for item in config.get("bindings", [])
-    ]
+    bindings = parse_bindings(config.get("apps", []))
 
     if command == "list":
-        for binding in bindings:
-            chord = " + ".join(sorted(binding.keys))
-            print(f"{binding.name}: {chord} -> {binding.command}")
+        for app in config.get("apps", []):
+            launch = app["launch"]
+            launch_keys = " + ".join(sorted(key.lower() for key in launch.get("keys", [])))
+            print(f"{app['name']} launch: {launch_keys} -> {launch.get('cmd', '')}")
+            for shortcut in app.get("shortcuts", []):
+                shortcut_keys = " + ".join(sorted(key.lower() for key in shortcut.get("keys", [])))
+                print(f"{app['name']} shortcut {shortcut['name']}: {shortcut_keys} -> {shortcut.get('cmd', '')}")
         return
 
     if command == "edit":
@@ -62,7 +58,7 @@ def main() -> None:
 
     from quiktieper.listener import ChordListener
 
-    print(f"Listening for {len(bindings)} app chords from {args.config}")
+    print(f"Listening for {len(bindings)} launch and shortcut chords from {args.config}")
     ChordListener(bindings).run()
 
 

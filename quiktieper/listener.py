@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
-
 from pynput import keyboard
 
 from quiktieper.launcher import AppLauncher, Binding
@@ -33,21 +31,6 @@ def normalize_key(key: keyboard.Key | keyboard.KeyCode) -> str | None:
     if isinstance(key, keyboard.KeyCode) and key.char:
         return key.char.lower()
     return None
-
-
-def parse_bindings(raw_bindings: Iterable[dict]) -> list[Binding]:
-    bindings: list[Binding] = []
-    for item in raw_bindings:
-        bindings.append(
-            Binding(
-                name=item["name"],
-                keys=frozenset(key.lower() for key in item["keys"]),
-                command=item.get("cmd") or item["command"],
-                cooldown_seconds=float(item.get("cooldown_seconds", 0.8)),
-            )
-        )
-    return bindings
-
 
 class ChordListener:
     def __init__(self, bindings: list[Binding]) -> None:

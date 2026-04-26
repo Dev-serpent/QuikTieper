@@ -5,8 +5,9 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox, ttk
 
+from quiktieper.bindings import parse_bindings
 from quiktieper.config import load_config, save_config
-from quiktieper.launcher import Binding
+from quiktieper.launcher import get_mouse_location
 
 
 class ConfigEditorApp:
@@ -14,12 +15,14 @@ class ConfigEditorApp:
         self.config_path = config_path
         self.root = tk.Tk()
         self.root.title("QuikTieper")
-        self.root.geometry("900x560")
+        self.root.geometry("1040x620")
 
-        self.selected_index: int | None = None
         self.listener = None
         self.listener_running = False
+        self.tree_index: dict[str, dict] = {}
         self._build_ui()
+        self.root.bind_all("<Alt-c>", self.capture_mouse_position_hotkey)
+        self.root.bind_all("<Alt-C>", self.capture_mouse_position_hotkey)
         self._load()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -64,47 +67,84 @@ class ConfigEditorApp:
         left.columnconfigure(0, weight=1)
         left.rowconfigure(0, weight=1)
 
-        self.binding_list = tk.Listbox(left, exportselection=False)
-        self.binding_list.grid(row=0, column=0, sticky="nsew")
-        self.binding_list.bind("<<ListboxSelect>>", self.on_binding_select)
+        self.binding_tree = ttk.Treeview(left, show="tree")
+        self.binding_tree.grid(row=0, column=0, sticky="nsew")
+        self.binding_tree.bind("<<TreeviewSelect>>", self.on_tree_select)
 
         actions = ttk.Frame(left)
         actions.grid(row=1, column=0, sticky="ew", pady=(10, 0))
         for index in range(4):
             actions.columnconfigure(index, weight=1)
-        ttk.Button(actions, text="Add", command=self.add_binding).grid(row=0, column=0, sticky="ew", padx=(0, 6))
-        ttk.Button(actions, text="Delete", command=self.delete_binding).grid(row=0, column=1, sticky="ew", padx=6)
-        ttk.Button(actions, text="New From Name", command=self.generate_keys_from_name).grid(
-            row=0, column=2, sticky="ew", padx=6
-        )
-        ttk.Button(actions, text="Save Binding", command=self.apply_form_to_selected).grid(
+        ttk.Button(actions, text="Add App", command=self.add_app).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        ttk.Button(actions, text="Add Shortcut", command=self.add_shortcut).grid(row=0, column=1, sticky="ew", padx=6)
+        ttk.Button(actions, text="Delete", command=self.delete_selected).grid(row=0, column=2, sticky="ew", padx=6)
+        ttk.Button(actions, text="Save Selected", command=self.save_selected).grid(
             row=0, column=3, sticky="ew", padx=(6, 0)
         )
 
-        right = ttk.LabelFrame(parent, text="Binding Editor", padding=12)
+        right = ttk.Frame(parent)
         right.grid(row=0, column=1, sticky="nsew")
-        right.columnconfigure(1, weight=1)
+        right.columnconfigure(0, weight=1)
 
-        ttk.Label(right, text="Name").grid(row=0, column=0, sticky="w", pady=6)
-        ttk.Label(right, text="Keys").grid(row=1, column=0, sticky="w", pady=6)
-        ttk.Label(right, text="Run Command").grid(row=2, column=0, sticky="w", pady=6)
-        ttk.Label(right, text="Cooldown").grid(row=3, column=0, sticky="w", pady=6)
+        app_frame = ttk.LabelFrame(right, text="App", padding=12)
+        app_frame.grid(row=0, column=0, sticky="ew")
+        app_frame.columnconfigure(1, weight=1)
 
-        self.name_var = tk.StringVar()
+        ttk.Label(app_frame, text="App Name").grid(row=0, column=0, sticky="w", pady=6)
+        ttk.Label(app_frame, text="Window Match").grid(row=1, column=0, sticky="w", pady=6)
+
+        self.app_name_var = tk.StringVar()
+        self.window_match_var = tk.StringVar()
+
+        ttk.Entry(app_frame, textvariable=self.app_name_var).grid(row=0, column=1, sticky="ew", pady=6)
+        ttk.Entry(app_frame, textvariable=self.window_match_var).grid(row=1, column=1, sticky="ew", pady=6)
+
+        binding_frame = ttk.LabelFrame(right, text="Binding", padding=12)
+        binding_frame.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
+        binding_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(binding_frame, text="Binding Name").grid(row=0, column=0, sticky="w", pady=6)
+        ttk.Label(binding_frame, text="Keys").grid(row=1, column=0, sticky="w", pady=6)
+        ttk.Label(binding_frame, text="Run Command").grid(row=2, column=0, sticky="w", pady=6)
+        ttk.Label(binding_frame, text="Instruction").grid(row=3, column=0, sticky="w", pady=6)
+        ttk.Label(binding_frame, text="QuikTieper Cmds").grid(row=4, column=0, sticky="w", pady=6)
+        ttk.Label(binding_frame, text="Cooldown").grid(row=5, column=0, sticky="w", pady=6)
+
+        self.binding_name_var = tk.StringVar()
         self.keys_var = tk.StringVar()
         self.command_var = tk.StringVar()
+        self.instruction_var = tk.StringVar()
+        self.quiktieper_cmds_var = tk.StringVar()
         self.cooldown_var = tk.StringVar(value="0.8")
 
-        ttk.Entry(right, textvariable=self.name_var).grid(row=0, column=1, sticky="ew", pady=6)
-        ttk.Entry(right, textvariable=self.keys_var).grid(row=1, column=1, sticky="ew", pady=6)
-        ttk.Entry(right, textvariable=self.command_var).grid(row=2, column=1, sticky="ew", pady=6)
-        ttk.Entry(right, textvariable=self.cooldown_var).grid(row=3, column=1, sticky="ew", pady=6)
+        ttk.Entry(binding_frame, textvariable=self.binding_name_var).grid(row=0, column=1, sticky="ew", pady=6)
+        ttk.Entry(binding_frame, textvariable=self.keys_var).grid(row=1, column=1, sticky="ew", pady=6)
+        ttk.Entry(binding_frame, textvariable=self.command_var).grid(row=2, column=1, sticky="ew", pady=6)
+        ttk.Entry(binding_frame, textvariable=self.instruction_var).grid(row=3, column=1, sticky="ew", pady=6)
+        ttk.Entry(binding_frame, textvariable=self.quiktieper_cmds_var).grid(row=4, column=1, sticky="ew", pady=6)
+        ttk.Entry(binding_frame, textvariable=self.cooldown_var).grid(row=5, column=1, sticky="ew", pady=6)
+
+        command_actions = ttk.Frame(binding_frame)
+        command_actions.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+        command_actions.columnconfigure(0, weight=1)
+        command_actions.columnconfigure(1, weight=1)
+        ttk.Button(command_actions, text="Capture Mouse Position", command=self.capture_mouse_position).grid(
+            row=0, column=0, sticky="ew", padx=(0, 6)
+        )
+        ttk.Button(command_actions, text="Clear Instruction", command=self.clear_instruction).grid(
+            row=0, column=1, sticky="ew", padx=(6, 0)
+        )
 
         hint = (
-            "Keys are comma-separated. Example: alt, b, r, v\n"
-            "Use New From Name to build a chord like alt + b + r + v from Brave."
+            "Select an app node to edit app metadata.\n"
+            "Select Launch or a shortcut under an app to edit that binding.\n"
+            "Press Alt+C inside this window to capture the current mouse position.\n"
+            "Use instruction like mouse:1200,420 to move the pointer first.\n"
+            "QuikTieper Cmds accepts values like mouse-left-click, mouse-right-click."
         )
-        ttk.Label(right, text=hint, justify="left").grid(row=4, column=0, columnspan=2, sticky="w", pady=(10, 0))
+        ttk.Label(binding_frame, text=hint, justify="left").grid(
+            row=7, column=0, columnspan=2, sticky="w", pady=(10, 0)
+        )
 
     def _build_json_tab(self, parent: ttk.Frame) -> None:
         parent.columnconfigure(0, weight=1)
@@ -122,90 +162,173 @@ class ConfigEditorApp:
 
     def _load(self) -> None:
         self.config = load_config(self.config_path)
-        self._refresh_list()
+        self._refresh_tree()
         self._refresh_json_text()
         self._clear_form()
         self.status_var.set(f"Loaded {self.config_path}")
 
-    def _refresh_list(self) -> None:
-        self.binding_list.delete(0, tk.END)
-        for binding in self.config.get("bindings", []):
-            keys = " + ".join(binding.get("keys", []))
-            self.binding_list.insert(tk.END, f'{binding.get("name", "unnamed")} [{keys}]')
+    def _refresh_tree(self) -> None:
+        self.binding_tree.delete(*self.binding_tree.get_children())
+        self.tree_index.clear()
+        for app_index, app in enumerate(self.config.get("apps", [])):
+            app_id = self.binding_tree.insert("", tk.END, text=app["name"], open=True)
+            self.tree_index[app_id] = {"kind": "app", "app_index": app_index}
+
+            launch = app.get("launch", {})
+            launch_keys = " + ".join(launch.get("keys", []))
+            launch_id = self.binding_tree.insert(app_id, tk.END, text=f"Launch [{launch_keys}]")
+            self.tree_index[launch_id] = {
+                "kind": "launch",
+                "app_index": app_index,
+            }
+
+            for shortcut_index, shortcut in enumerate(app.get("shortcuts", [])):
+                shortcut_keys = " + ".join(shortcut.get("keys", []))
+                shortcut_id = self.binding_tree.insert(
+                    app_id,
+                    tk.END,
+                    text=f"{shortcut.get('name', 'shortcut')} [{shortcut_keys}]",
+                )
+                self.tree_index[shortcut_id] = {
+                    "kind": "shortcut",
+                    "app_index": app_index,
+                    "shortcut_index": shortcut_index,
+                }
 
     def _refresh_json_text(self) -> None:
         self.json_text.delete("1.0", tk.END)
         self.json_text.insert("1.0", json.dumps(self.config, indent=2))
 
     def _clear_form(self) -> None:
-        self.selected_index = None
-        self.name_var.set("")
+        self.app_name_var.set("")
+        self.window_match_var.set("")
+        self.binding_name_var.set("")
         self.keys_var.set("")
         self.command_var.set("")
+        self.instruction_var.set("")
+        self.quiktieper_cmds_var.set("")
         self.cooldown_var.set("0.8")
 
-    def on_binding_select(self, _event: object) -> None:
-        selection = self.binding_list.curselection()
+    def _selected_item(self) -> tuple[str | None, dict | None]:
+        selection = self.binding_tree.selection()
         if not selection:
+            return None, None
+        item_id = selection[0]
+        return item_id, self.tree_index.get(item_id)
+
+    def on_tree_select(self, _event: object) -> None:
+        _item_id, info = self._selected_item()
+        if info is None:
             return
 
-        self.selected_index = selection[0]
-        binding = self.config["bindings"][self.selected_index]
-        self.name_var.set(binding.get("name", ""))
+        app = self.config["apps"][info["app_index"]]
+        self.app_name_var.set(app.get("name", ""))
+        self.window_match_var.set(app.get("window_match", ""))
+
+        if info["kind"] == "app":
+            self.binding_name_var.set("")
+            self.keys_var.set("")
+            self.command_var.set("")
+            self.instruction_var.set("")
+            self.quiktieper_cmds_var.set("")
+            self.cooldown_var.set("0.8")
+            return
+
+        binding = app["launch"] if info["kind"] == "launch" else app["shortcuts"][info["shortcut_index"]]
+        self.binding_name_var.set(binding.get("name", ""))
         self.keys_var.set(", ".join(binding.get("keys", [])))
-        self.command_var.set(binding.get("cmd", binding.get("command", "")))
+        self.command_var.set(binding.get("cmd", ""))
+        self.instruction_var.set(binding.get("instruction", ""))
+        self.quiktieper_cmds_var.set(", ".join(binding.get("quiktieper_cmds", [])))
         self.cooldown_var.set(str(binding.get("cooldown_seconds", 0.8)))
 
-    def add_binding(self) -> None:
-        binding = self._binding_from_form()
-        if binding is None:
-            return
-
-        self.config.setdefault("bindings", []).append(binding)
-        self._refresh_list()
+    def add_app(self) -> None:
+        app = {
+            "name": "new-app",
+            "window_match": "",
+            "launch": {
+                "name": "launch",
+                "keys": ["alt"],
+                "cmd": "",
+                "instruction": "",
+                "quiktieper_cmds": [],
+                "cooldown_seconds": 0.8,
+            },
+            "shortcuts": [],
+        }
+        self.config.setdefault("apps", []).append(app)
+        self._refresh_tree()
         self._refresh_json_text()
-        self.status_var.set("Added binding")
+        self.status_var.set("Added app")
 
-    def delete_binding(self) -> None:
-        selection = self.binding_list.curselection()
-        if not selection:
-            messagebox.showwarning("No selection", "Select a binding to delete.")
+    def add_shortcut(self) -> None:
+        _item_id, info = self._selected_item()
+        if info is None:
+            messagebox.showwarning("No selection", "Select an app or one of its bindings first.")
             return
 
-        del self.config["bindings"][selection[0]]
-        self._refresh_list()
+        app = self.config["apps"][info["app_index"]]
+        app.setdefault("shortcuts", []).append(
+            {
+                "name": "new-shortcut",
+                "keys": ["alt"],
+                "cmd": "",
+                "instruction": "",
+                "quiktieper_cmds": [],
+                "cooldown_seconds": 0.8,
+            }
+        )
+        self._refresh_tree()
+        self._refresh_json_text()
+        self.status_var.set(f"Added shortcut under {app['name']}")
+
+    def delete_selected(self) -> None:
+        _item_id, info = self._selected_item()
+        if info is None:
+            messagebox.showwarning("No selection", "Select an app or shortcut to delete.")
+            return
+
+        if info["kind"] == "app":
+            del self.config["apps"][info["app_index"]]
+        elif info["kind"] == "shortcut":
+            del self.config["apps"][info["app_index"]]["shortcuts"][info["shortcut_index"]]
+        else:
+            messagebox.showwarning("Protected binding", "Each app must keep its Launch binding.")
+            return
+
+        self._refresh_tree()
         self._refresh_json_text()
         self._clear_form()
-        self.status_var.set("Deleted binding")
+        self.status_var.set("Deleted selection")
 
-    def apply_form_to_selected(self) -> None:
-        binding = self._binding_from_form()
-        if binding is None:
+    def save_selected(self) -> None:
+        _item_id, info = self._selected_item()
+        if info is None:
+            messagebox.showwarning("No selection", "Select an app or binding to save.")
             return
 
-        if self.selected_index is None:
-            self.config.setdefault("bindings", []).append(binding)
-            self.selected_index = len(self.config["bindings"]) - 1
-            self.status_var.set("Added binding")
-        else:
-            self.config["bindings"][self.selected_index] = binding
-            self.status_var.set("Updated binding")
+        app = self.config["apps"][info["app_index"]]
+        app_name = self.app_name_var.get().strip()
+        window_match = self.window_match_var.get().strip().lower()
+        if not app_name:
+            messagebox.showerror("Missing app name", "App name is required.")
+            return
 
-        self._refresh_list()
+        app["name"] = app_name
+        app["window_match"] = window_match
+
+        if info["kind"] != "app":
+            binding = self._binding_from_form()
+            if binding is None:
+                return
+            if info["kind"] == "launch":
+                app["launch"] = binding
+            else:
+                app["shortcuts"][info["shortcut_index"]] = binding
+
+        self._refresh_tree()
         self._refresh_json_text()
-        self.binding_list.selection_clear(0, tk.END)
-        self.binding_list.selection_set(self.selected_index)
-        self.binding_list.activate(self.selected_index)
-
-    def generate_keys_from_name(self) -> None:
-        name = self.name_var.get().strip().lower()
-        letters = [char for char in name if char.isalnum()]
-        if not letters:
-            messagebox.showwarning("Missing name", "Enter a name first.")
-            return
-
-        self.keys_var.set(", ".join(["alt", *letters[:4]]))
-        self.status_var.set("Generated chord from app name")
+        self.status_var.set("Saved selection into editor state")
 
     def validate_json(self) -> None:
         try:
@@ -213,20 +336,12 @@ class ConfigEditorApp:
         except json.JSONDecodeError as exc:
             messagebox.showerror("Invalid JSON", str(exc))
             return
-
         messagebox.showinfo("Valid JSON", "The raw JSON tab is valid.")
 
     def save_all(self) -> None:
         if self.notebook.tab(self.notebook.select(), "text") == "Bindings":
-            binding = self._binding_from_form(allow_blank=True)
-            if binding is not None:
-                if self.selected_index is None:
-                    self.config.setdefault("bindings", []).append(binding)
-                    self.selected_index = len(self.config["bindings"]) - 1
-                else:
-                    self.config["bindings"][self.selected_index] = binding
-                self._refresh_list()
-                self._refresh_json_text()
+            if self.binding_tree.selection():
+                self.save_selected()
             parsed = self.config
         else:
             try:
@@ -235,13 +350,10 @@ class ConfigEditorApp:
                 messagebox.showerror("Invalid JSON", f"Fix the raw JSON first.\n\n{exc}")
                 return
 
-        if "bindings" not in parsed or not isinstance(parsed["bindings"], list):
-            messagebox.showerror("Invalid config", 'Config must contain a "bindings" list.')
-            return
-
         save_config(parsed, self.config_path)
-        self.config = parsed
-        self._refresh_list()
+        self.config = load_config(self.config_path)
+        self._refresh_tree()
+        self._refresh_json_text()
         if self.listener_running:
             self._restart_listener()
         self.status_var.set(f"Saved {self.config_path}")
@@ -250,7 +362,6 @@ class ConfigEditorApp:
         if self.listener_running:
             self._stop_listener()
             return
-
         self._start_listener()
 
     def _start_listener(self) -> None:
@@ -261,7 +372,7 @@ class ConfigEditorApp:
             return
 
         try:
-            bindings = self._bindings_from_config(self.config)
+            bindings = parse_bindings(self.config.get("apps", []))
             self.listener = ChordListener(bindings)
             self.listener.start()
         except Exception as exc:
@@ -292,17 +403,23 @@ class ConfigEditorApp:
         self._stop_listener()
         self._start_listener()
 
-    def _binding_from_form(self, allow_blank: bool = False) -> dict | None:
-        name = self.name_var.get().strip()
+    def _binding_from_form(self) -> dict | None:
+        name = self.binding_name_var.get().strip()
         command = self.command_var.get().strip()
+        instruction = self.instruction_var.get().strip()
+        quiktieper_cmds = [item.strip() for item in self.quiktieper_cmds_var.get().split(",") if item.strip()]
         keys = [key.strip().lower() for key in self.keys_var.get().split(",") if key.strip()]
         cooldown_text = self.cooldown_var.get().strip()
 
-        if allow_blank and not name and not command and not keys and cooldown_text in {"", "0.8"}:
+        if not name or not keys:
+            messagebox.showerror("Missing fields", "Binding name and keys are required.")
             return None
 
-        if not name or not command or not keys:
-            messagebox.showerror("Missing fields", "Name, keys, and command are required.")
+        if not command and not instruction and not quiktieper_cmds:
+            messagebox.showerror(
+                "Missing action",
+                "Provide at least one of Run Command, Instruction, or QuikTieper Cmds.",
+            )
             return None
 
         try:
@@ -315,19 +432,27 @@ class ConfigEditorApp:
             "name": name,
             "keys": keys,
             "cmd": command,
+            "instruction": instruction,
+            "quiktieper_cmds": quiktieper_cmds,
             "cooldown_seconds": cooldown_seconds,
         }
 
-    def _bindings_from_config(self, config: dict) -> list[Binding]:
-        return [
-            Binding(
-                name=item["name"],
-                keys=frozenset(key.lower() for key in item["keys"]),
-                command=item.get("cmd") or item["command"],
-                cooldown_seconds=float(item.get("cooldown_seconds", 0.8)),
-            )
-            for item in config.get("bindings", [])
-        ]
+    def capture_mouse_position(self) -> None:
+        position = get_mouse_location()
+        if position is None:
+            messagebox.showerror("Mouse capture failed", "Could not read the current mouse position from xdotool.")
+            return
+        x_pos, y_pos = position
+        self.instruction_var.set(f"mouse:{x_pos},{y_pos}")
+        self.status_var.set(f"Captured mouse position {x_pos},{y_pos}")
+
+    def capture_mouse_position_hotkey(self, _event: tk.Event[tk.Misc]) -> str:
+        self.capture_mouse_position()
+        return "break"
+
+    def clear_instruction(self) -> None:
+        self.instruction_var.set("")
+        self.status_var.set("Cleared instruction")
 
     def _on_close(self) -> None:
         if self.listener_running:
