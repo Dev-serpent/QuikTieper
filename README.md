@@ -1,6 +1,6 @@
-# Fiona
+# Fiona-Quiktiper
 
-Fiona is a mouse-free app launcher built around simultaneous key chords, focused-app shortcuts, and pointer actions.
+Fiona-QuikTieper is a mouse-free app launcher built around simultaneous key chords, focused-app shortcuts, and pointer actions.
 
 The core idea is simple:
 - instead of clicking icons, you hold 3-5 keys together at once
