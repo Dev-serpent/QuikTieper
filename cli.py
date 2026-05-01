@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
-from quiktieper.bindings import parse_bindings
-from quiktieper.config import DEFAULT_CONFIG_PATH, ensure_config, load_config
+from fiona.bindings import parse_bindings
+from fiona.config import DEFAULT_CONFIG_PATH, ensure_config, load_config
+from fiona.launcher import ensure_ydotoold_running
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="quiktieper",
+        prog="fiona",
         description="Launch apps and focused-app shortcuts using simultaneous key chords.",
     )
     parser.add_argument(
@@ -40,6 +42,11 @@ def main() -> None:
     config = load_config(args.config)
     bindings = parse_bindings(config.get("apps", []))
 
+    # On Wayland, bootstrap ydotoold up front so auth happens at app start
+    # instead of during the first click action.
+    if os.environ.get("WAYLAND_DISPLAY"):
+        ensure_ydotoold_running()
+
     if command == "list":
         for app in config.get("apps", []):
             launch = app["launch"]
@@ -51,12 +58,12 @@ def main() -> None:
         return
 
     if command == "edit":
-        from quiktieper.gui import launch_editor
+        from fiona.gui import launch_editor
 
         launch_editor(args.config)
         return
 
-    from quiktieper.listener import ChordListener
+    from fiona.listener import ChordListener
 
     print(f"Listening for {len(bindings)} launch and shortcut chords from {args.config}")
     ChordListener(bindings).run()

@@ -5,16 +5,16 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import messagebox, ttk
 
-from quiktieper.bindings import parse_bindings
-from quiktieper.config import load_config, save_config
-from quiktieper.launcher import get_mouse_location
+from fiona.bindings import parse_bindings
+from fiona.config import load_config, save_config
+from fiona.launcher import get_mouse_location
 
 
 class ConfigEditorApp:
     def __init__(self, config_path: Path) -> None:
         self.config_path = config_path
         self.root = tk.Tk()
-        self.root.title("QuikTieper")
+        self.root.title("Fiona")
         self.root.geometry("1040x620")
 
         self.listener = None
@@ -107,21 +107,21 @@ class ConfigEditorApp:
         ttk.Label(binding_frame, text="Keys").grid(row=1, column=0, sticky="w", pady=6)
         ttk.Label(binding_frame, text="Run Command").grid(row=2, column=0, sticky="w", pady=6)
         ttk.Label(binding_frame, text="Instruction").grid(row=3, column=0, sticky="w", pady=6)
-        ttk.Label(binding_frame, text="QuikTieper Cmds").grid(row=4, column=0, sticky="w", pady=6)
+        ttk.Label(binding_frame, text="Fiona Cmds").grid(row=4, column=0, sticky="w", pady=6)
         ttk.Label(binding_frame, text="Cooldown").grid(row=5, column=0, sticky="w", pady=6)
 
         self.binding_name_var = tk.StringVar()
         self.keys_var = tk.StringVar()
         self.command_var = tk.StringVar()
         self.instruction_var = tk.StringVar()
-        self.quiktieper_cmds_var = tk.StringVar()
+        self.fiona_cmds_var = tk.StringVar()
         self.cooldown_var = tk.StringVar(value="0.8")
 
         ttk.Entry(binding_frame, textvariable=self.binding_name_var).grid(row=0, column=1, sticky="ew", pady=6)
         ttk.Entry(binding_frame, textvariable=self.keys_var).grid(row=1, column=1, sticky="ew", pady=6)
         ttk.Entry(binding_frame, textvariable=self.command_var).grid(row=2, column=1, sticky="ew", pady=6)
         ttk.Entry(binding_frame, textvariable=self.instruction_var).grid(row=3, column=1, sticky="ew", pady=6)
-        ttk.Entry(binding_frame, textvariable=self.quiktieper_cmds_var).grid(row=4, column=1, sticky="ew", pady=6)
+        ttk.Entry(binding_frame, textvariable=self.fiona_cmds_var).grid(row=4, column=1, sticky="ew", pady=6)
         ttk.Entry(binding_frame, textvariable=self.cooldown_var).grid(row=5, column=1, sticky="ew", pady=6)
 
         command_actions = ttk.Frame(binding_frame)
@@ -140,7 +140,7 @@ class ConfigEditorApp:
             "Select Launch or a shortcut under an app to edit that binding.\n"
             "Press Alt+C inside this window to capture the current mouse position.\n"
             "Use instruction like mouse:1200,420 to move the pointer first.\n"
-            "QuikTieper Cmds accepts values like mouse-left-click, mouse-right-click."
+            "Fiona Cmds accepts values like mouse-left-click, mouse-right-click."
         )
         ttk.Label(binding_frame, text=hint, justify="left").grid(
             row=7, column=0, columnspan=2, sticky="w", pady=(10, 0)
@@ -206,7 +206,7 @@ class ConfigEditorApp:
         self.keys_var.set("")
         self.command_var.set("")
         self.instruction_var.set("")
-        self.quiktieper_cmds_var.set("")
+        self.fiona_cmds_var.set("")
         self.cooldown_var.set("0.8")
 
     def _selected_item(self) -> tuple[str | None, dict | None]:
@@ -230,7 +230,7 @@ class ConfigEditorApp:
             self.keys_var.set("")
             self.command_var.set("")
             self.instruction_var.set("")
-            self.quiktieper_cmds_var.set("")
+            self.fiona_cmds_var.set("")
             self.cooldown_var.set("0.8")
             return
 
@@ -239,7 +239,7 @@ class ConfigEditorApp:
         self.keys_var.set(", ".join(binding.get("keys", [])))
         self.command_var.set(binding.get("cmd", ""))
         self.instruction_var.set(binding.get("instruction", ""))
-        self.quiktieper_cmds_var.set(", ".join(binding.get("quiktieper_cmds", [])))
+        self.fiona_cmds_var.set(", ".join(binding.get("fiona_cmds", binding.get("quiktieper_cmds", []))))
         self.cooldown_var.set(str(binding.get("cooldown_seconds", 0.8)))
 
     def add_app(self) -> None:
@@ -251,7 +251,7 @@ class ConfigEditorApp:
                 "keys": ["alt"],
                 "cmd": "",
                 "instruction": "",
-                "quiktieper_cmds": [],
+                "fiona_cmds": [],
                 "cooldown_seconds": 0.8,
             },
             "shortcuts": [],
@@ -274,7 +274,7 @@ class ConfigEditorApp:
                 "keys": ["alt"],
                 "cmd": "",
                 "instruction": "",
-                "quiktieper_cmds": [],
+                "fiona_cmds": [],
                 "cooldown_seconds": 0.8,
             }
         )
@@ -366,7 +366,7 @@ class ConfigEditorApp:
 
     def _start_listener(self) -> None:
         try:
-            from quiktieper.listener import ChordListener
+            from fiona.listener import ChordListener
         except Exception as exc:
             messagebox.showerror("Listener error", f"Could not import keyboard hook.\n\n{exc}")
             return
@@ -407,7 +407,7 @@ class ConfigEditorApp:
         name = self.binding_name_var.get().strip()
         command = self.command_var.get().strip()
         instruction = self.instruction_var.get().strip()
-        quiktieper_cmds = [item.strip() for item in self.quiktieper_cmds_var.get().split(",") if item.strip()]
+        fiona_cmds = [item.strip() for item in self.fiona_cmds_var.get().split(",") if item.strip()]
         keys = [key.strip().lower() for key in self.keys_var.get().split(",") if key.strip()]
         cooldown_text = self.cooldown_var.get().strip()
 
@@ -415,10 +415,10 @@ class ConfigEditorApp:
             messagebox.showerror("Missing fields", "Binding name and keys are required.")
             return None
 
-        if not command and not instruction and not quiktieper_cmds:
+        if not command and not instruction and not fiona_cmds:
             messagebox.showerror(
                 "Missing action",
-                "Provide at least one of Run Command, Instruction, or QuikTieper Cmds.",
+                "Provide at least one of Run Command, Instruction, or Fiona Cmds.",
             )
             return None
 
@@ -433,7 +433,7 @@ class ConfigEditorApp:
             "keys": keys,
             "cmd": command,
             "instruction": instruction,
-            "quiktieper_cmds": quiktieper_cmds,
+            "fiona_cmds": fiona_cmds,
             "cooldown_seconds": cooldown_seconds,
         }
 

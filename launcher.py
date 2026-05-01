@@ -1,23 +1,25 @@
 from __future__ import annotations
 
+import logging
+import os
 import re
 import shutil
 import subprocess
 import time
 from dataclasses import dataclass
-import os
 from pathlib import Path
 
 try:
-    from wayland_automation import click as wayland_click
+    from wayland_automation import Mouse as WaylandMouse
 except ImportError:
-    wayland_click = None
+    WaylandMouse = None
 
 
 _LAST_POINTER_TARGET: tuple[int, int] | None = None
 _YDOTOOLD_START_ATTEMPTED = False
-DEBUG_LOG_PATH = Path.home() / ".config" / "quiktieper" / "debug.log"
-FALLBACK_DEBUG_LOG_PATH = Path("/tmp/quiktieper-debug.log")
+_WAYLAND_MOUSE: object | None = None
+DEBUG_LOG_PATH = Path.home() / ".config" / "fiona" / "debug.log"
+FALLBACK_DEBUG_LOG_PATH = Path("/tmp/fiona-debug.log")
 
 
 @dataclass(frozen=True)
@@ -26,7 +28,7 @@ class Binding:
     keys: frozenset[str]
     command: str
     instruction: str = ""
-    quiktieper_cmds: tuple[str, ...] = ()
+    fiona_cmds: tuple[str, ...] = ()
     cooldown_seconds: float = 0.8
     app_name: str | None = None
     window_match: str | None = None
@@ -43,6 +45,10 @@ def write_debug_log(message: str) -> None:
             return
         except OSError:
             continue
+
+
+if WaylandMouse is not None:
+    logging.getLogger("wayland_automation.mouse_controller").setLevel(logging.ERROR)
 
 
 def get_mouse_location() -> tuple[int, int] | None:
@@ -86,9 +92,9 @@ def run_instruction(instruction: str) -> None:
         )
 
 
-def run_quiktieper_command(command: str) -> None:
+def run_fiona_command(command: str) -> None:
     normalized = command.strip().lower()
-    write_debug_log(f"running quiktieper command {normalized}")
+    write_debug_log(f"running fiona command {normalized}")
     if normalized == "mouse-left-click":
         x_pos = _LAST_POINTER_TARGET[0] if _LAST_POINTER_TARGET is not None else None
         y_pos = _LAST_POINTER_TARGET[1] if _LAST_POINTER_TARGET is not None else None
@@ -118,15 +124,6 @@ def run_pointer_backends(
     x11_command: list[str],
     wayland_command: list[str],
 ) -> bool:
-    if wayland_click is not None and x is not None and y is not None:
-        try:
-            wayland_click(x, y, button if button is not None else "nothing")
-            write_debug_log(f"wayland_automation handled pointer action x={x} y={y} button={button}")
-            return True
-        except Exception:
-            write_debug_log(f"wayland_automation failed for x={x} y={y} button={button}")
-            pass
-
     commands_to_try: list[list[str]] = []
     prefer_wayland = bool(os.environ.get("WAYLAND_DISPLAY"))
     if shutil.which(wayland_command[0]):
@@ -148,7 +145,26 @@ def run_pointer_backends(
             write_debug_log(f"pointer backend succeeded: {' '.join(command)}")
             return True
         write_debug_log(f"pointer backend failed ({result.returncode}): {' '.join(command)}")
+
+    if WaylandMouse is not None and x is not None and y is not None:
+        try:
+            get_wayland_mouse().click(x, y, button if button is not None else "nothing")
+            write_debug_log(f"wayland_automation handled pointer action x={x} y={y} button={button}")
+            return True
+        except Exception:
+            write_debug_log(f"wayland_automation failed for x={x} y={y} button={button}")
+            pass
     return False
+
+
+def get_wayland_mouse() -> object:
+    global _WAYLAND_MOUSE
+    if _WAYLAND_MOUSE is None:
+        if WaylandMouse is None:
+            raise RuntimeError("wayland-automation is not installed")
+        _WAYLAND_MOUSE = WaylandMouse()
+        write_debug_log("initialized cached wayland_automation mouse client")
+    return _WAYLAND_MOUSE
 
 
 def ydotool_socket_path() -> Path:
@@ -305,12 +321,12 @@ class AppLauncher:
     def launch(self, binding: Binding) -> None:
         write_debug_log(
             f"launching {binding.name} cmd={binding.command!r} instruction={binding.instruction!r} "
-            f"quiktieper_cmds={list(binding.quiktieper_cmds)!r}"
+            f"fiona_cmds={list(binding.fiona_cmds)!r}"
         )
         if binding.instruction:
             run_instruction(binding.instruction)
-        for internal_command in binding.quiktieper_cmds:
-            run_quiktieper_command(internal_command)
+        for internal_command in binding.fiona_cmds:
+            run_fiona_command(internal_command)
         if binding.command.strip():
             subprocess.Popen(["bash", "-lc", binding.command])
             write_debug_log(f"spawned shell command for {binding.name}: {binding.command}")

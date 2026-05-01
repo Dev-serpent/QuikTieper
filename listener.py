@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pynput import keyboard
 
-from quiktieper.launcher import AppLauncher, Binding, write_debug_log
+from fiona.launcher import AppLauncher, Binding, write_debug_log
 
 
 SPECIAL_KEYS = {

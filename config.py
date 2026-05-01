@@ -5,7 +5,7 @@ import shlex
 from pathlib import Path
 
 
-DEFAULT_CONFIG_PATH = Path.home() / ".config" / "quiktieper" / "bindings.json"
+DEFAULT_CONFIG_PATH = Path.home() / ".config" / "fiona" / "bindings.json"
 
 DEFAULT_CONFIG = {
     "apps": [
@@ -19,11 +19,60 @@ DEFAULT_CONFIG = {
             },
             "shortcuts": [
                 {
-                    "name": "focus-url-bar",
+                    "name": "search",
                     "keys": ["alt", "s"],
-                    "cmd": "xdotool key ctrl+l",
+                    "cmd": "ydotool key 29:1 38:1 38:0 29:0",
                     "instruction": "",
-                    "quiktieper_cmds": [],
+                    "fiona_cmds": [],
+                },
+                {
+                    "name": "new-tab",
+                    "keys": ["alt", "t"],
+                    "cmd": "ydotool key 29:1 20:1 20:0 29:0",
+                    "instruction": "",
+                    "fiona_cmds": [],
+                },
+                {
+                    "name": "close-tab",
+                    "keys": ["alt", "w"],
+                    "cmd": "ydotool key 29:1 17:1 17:0 29:0",
+                    "instruction": "",
+                    "fiona_cmds": [],
+                },
+                {
+                    "name": "find",
+                    "keys": ["alt", "f"],
+                    "cmd": "ydotool key 29:1 33:1 33:0 29:0",
+                    "instruction": "",
+                    "fiona_cmds": [],
+                },
+                {
+                    "name": "history",
+                    "keys": ["alt", "h"],
+                    "cmd": "ydotool key 29:1 35:1 35:0 29:0",
+                    "instruction": "",
+                    "fiona_cmds": [],
+                },
+                {
+                    "name": "previous-tab",
+                    "keys": ["alt", "q"],
+                    "cmd": "ydotool key 29:1 42:1 15:1 15:0 42:0 29:0",
+                    "instruction": "",
+                    "fiona_cmds": [],
+                },
+                {
+                    "name": "next-tab",
+                    "keys": ["alt", "e"],
+                    "cmd": "ydotool key 29:1 15:1 15:0 29:0",
+                    "instruction": "",
+                    "fiona_cmds": [],
+                },
+                {
+                    "name": "reload",
+                    "keys": ["alt", "r"],
+                    "cmd": "ydotool key 29:1 19:1 19:0 29:0",
+                    "instruction": "",
+                    "fiona_cmds": [],
                 }
             ],
         },
@@ -35,7 +84,50 @@ DEFAULT_CONFIG = {
                 "keys": ["alt", "v", "s", "c"],
                 "cmd": "code",
             },
-            "shortcuts": [],
+            "shortcuts": [
+                {
+                    "name": "search",
+                    "keys": ["alt", "s"],
+                    "cmd": "ydotool key 29:1 42:1 33:1 33:0 42:0 29:0",
+                    "instruction": "",
+                    "fiona_cmds": [],
+                },
+                {
+                    "name": "new-file",
+                    "keys": ["alt", "t"],
+                    "cmd": "ydotool key 29:1 49:1 49:0 29:0",
+                    "instruction": "",
+                    "fiona_cmds": [],
+                },
+                {
+                    "name": "close-editor",
+                    "keys": ["alt", "w"],
+                    "cmd": "ydotool key 29:1 17:1 17:0 29:0",
+                    "instruction": "",
+                    "fiona_cmds": [],
+                },
+                {
+                    "name": "find",
+                    "keys": ["alt", "f"],
+                    "cmd": "ydotool key 29:1 33:1 33:0 29:0",
+                    "instruction": "",
+                    "fiona_cmds": [],
+                },
+                {
+                    "name": "explorer",
+                    "keys": ["alt", "e"],
+                    "cmd": "ydotool key 29:1 42:1 18:1 18:0 42:0 29:0",
+                    "instruction": "",
+                    "fiona_cmds": [],
+                },
+                {
+                    "name": "command-palette",
+                    "keys": ["alt", "p"],
+                    "cmd": "ydotool key 29:1 42:1 25:1 25:0 42:0 29:0",
+                    "instruction": "",
+                    "fiona_cmds": [],
+                }
+            ],
         },
         {
             "name": "terminal",
@@ -44,6 +136,16 @@ DEFAULT_CONFIG = {
                 "name": "launch",
                 "keys": ["alt", "t", "e", "r"],
                 "cmd": "gnome-terminal",
+            },
+            "shortcuts": [],
+        },
+        {
+            "name": "files",
+            "window_match": "dolphin",
+            "launch": {
+                "name": "launch",
+                "keys": ["alt", "f", "i", "l"],
+                "cmd": "dolphin",
             },
             "shortcuts": [],
         },
@@ -66,15 +168,15 @@ def infer_window_match(command: str) -> str:
 
 
 def normalize_binding(binding: dict, default_name: str) -> dict:
-    quiktieper_cmds = binding.get("quiktieper_cmds", [])
-    if isinstance(quiktieper_cmds, str):
-        quiktieper_cmds = [item.strip() for item in quiktieper_cmds.split(",") if item.strip()]
+    fiona_cmds = binding.get("fiona_cmds", binding.get("quiktieper_cmds", []))
+    if isinstance(fiona_cmds, str):
+        fiona_cmds = [item.strip() for item in fiona_cmds.split(",") if item.strip()]
     return {
         "name": binding.get("name", default_name),
         "keys": [key.lower() for key in binding.get("keys", [])],
         "cmd": binding.get("cmd") or binding.get("command", ""),
         "instruction": binding.get("instruction", "").strip(),
-        "quiktieper_cmds": quiktieper_cmds,
+        "fiona_cmds": fiona_cmds,
         "cooldown_seconds": float(binding.get("cooldown_seconds", 0.8)),
     }
 

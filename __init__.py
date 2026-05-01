@@ -1,1 +1,1 @@
-"""QuikTieper package."""
+"""Fiona package."""
