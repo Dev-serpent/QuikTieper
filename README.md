@@ -134,7 +134,5 @@ Example config:
 
 ## Next logical steps
 
-- add a tray process or small control panel
-- support multiple modes or layers of bindings
-- add window focus and workspace actions
-- store per-app metadata like icon, category, and startup rules
+- Fiona Is going to go into advanced terittory later on the inclusion of voice control so this is the base layer built for it.
+- The Fiona Project's name is based on M2 (FNF secret of mimic's fiona)
