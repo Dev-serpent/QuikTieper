@@ -1,138 +1,293 @@
-# Fiona-Quiktiper
+# Fiona
 
-Fiona-QuikTieper is a mouse-free app launcher built around simultaneous key chords, focused-app shortcuts, and pointer actions.
+Fiona is a local host-control project inspired by JARVIS-style workstation control. It is not an AI agent yet. The current project is the software base around that future agent: local actions, encrypted device communication, and a simple 3D hologram viewer.
 
-The core idea is simple:
-- instead of clicking icons, you hold 3-5 keys together at once
-- each launch chord maps to one app
-- app-specific chords can trigger actions inside the focused app
-- a binding can move the pointer, click, and then run a shell command
-- the letters inside the chord can represent the app name
-- the launcher listens globally and opens what you need immediately
+The installable command is:
 
-This is not a TUI. It is a background launcher daemon for people who want the keyboard to be the entire navigation layer.
+```bash
+fiona
+```
 
-Example:
-- press `alt + b + r + v` -> open Brave
-- press `alt + v + s + c` -> open VS Code
-- press `alt + t + e + r` -> open terminal
-- in Brave, press `alt + s` -> focus the URL bar
+## Current Architecture
 
-## MVP
+Fiona is the umbrella package. It exposes three sibling subsystems:
 
-The current project provides:
-- a Python CLI daemon
-- a JSON config for app launch bindings and app-specific shortcuts
-- a GUI editor with an app tree and per-app shortcut entries
-- simultaneous key chord detection
-- command launching with a small cooldown to avoid accidental repeats
-- focused-app shortcut matching using `xprop`
-- pointer actions using recorded mouse positions and built-in click commands
+- `QuikTieper`: local access layer for keyboard chords, app launching, shortcuts, pointer movement, clicks, and remote action execution.
+- `CamComs`: communication layer for encoded/encrypted messages, currently focused on ESP32 sender to Fiona host receiver.
+- `Vsee`: 3D coordinate hologram viewer for point/edge wireframe shapes.
 
-Example bindings:
-- `alt + b + r + v` -> Brave
-- `alt + v + s + c` -> VS Code
-- `alt + t + e + r` -> terminal
-- when Brave is focused, `alt + s` -> focus URL bar
+Project layout:
+
+```text
+fiona/                 umbrella package and CLI entrypoint
+QuikTieper/            local access/action layer
+CamComs/               communication/encryption/host service layer
+CamComs/esp32payload/  ESP32 sender payload template
+Vsee/                  3D point/edge hologram model
+scripts/               local launch wrappers
+tests/                 Python tests
+DEVELOPERNOTE.md       detailed project notes and latest verification log
+pyproject.toml         package metadata and Python dependencies
+```
 
 ## Install
 
+The intended environment is the `quiktieper` Conda environment:
+
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+source ~/Applications/miniconda3/etc/profile.d/conda.sh
+conda activate quiktieper
+cd /home/Dhruv/Documents/Projects/Fiona
 pip install -e .
 ```
 
-## Usage
+Core Python dependencies are declared in `pyproject.toml`:
 
-Create the default config:
+- `cryptography`
+- `pynput`
+- `numpy`
+- `pandas`
 
-```bash
-fiona init
-```
+System/runtime tools used by local control:
 
-List bindings:
+- `ydotool` for pointer/keyboard automation
+- `kdotool` for KDE/Wayland active-window checks
+- `xdotool` / `xprop` as fallback or legacy paths
 
-```bash
-fiona list
-```
+## GUI
 
-Run the listener:
-
-```bash
-fiona run
-```
-
-Open the GUI editor:
+Open the shared GUI:
 
 ```bash
 fiona edit
 ```
 
-Inside the GUI:
-- use `Start Listener` to enable the background hotkey hook
-- the footer shows `Listener: running` or `Listener: stopped`
-- saving config while the listener is active restarts it with the new bindings
+Current panel order:
 
-The default config is written to:
+```text
+CamComs -> Vsee -> Bindings -> Raw Json -> Debug -> Host
+```
+
+Panel roles:
+
+- `CamComs`: generate identities, export public keys, encrypt/decrypt messages, send encoded envelopes, and run a local smoke test.
+- `Vsee`: edit 3D `points` and `edges` tables and render them as a connected wireframe hologram.
+- `Bindings`: edit QuikTieper app launchers and shortcut bindings.
+- `Raw Json`: edit the QuikTieper config JSON directly.
+- `Debug`: restricted project file editor for `tests`, `scripts`, `QuikTieper`, and `CamComs`.
+- `Host`: inspect host service config, trusted devices, key paths, and audit logs.
+
+## QuikTieper
+
+QuikTieper is the local access layer. It listens for simultaneous global key chords and runs configured actions.
+
+Default config path:
 
 ```text
 ~/.config/fiona/bindings.json
 ```
 
-Example config:
+Basic commands:
 
-```json
-{
-  "apps": [
-    {
-      "name": "brave",
-      "window_match": "brave-browser",
-      "launch": {
-        "name": "launch",
-        "keys": ["alt", "b", "r", "v"],
-        "cmd": "brave-browser"
-      },
-      "shortcuts": [
-        {
-          "name": "focus-url-bar",
-          "keys": ["alt", "s"],
-          "cmd": "xdotool key ctrl+l",
-          "instruction": "",
-          "fiona_cmds": []
-        }
-      ]
-    },
-    {
-      "name": "vs-code",
-      "window_match": "code",
-      "launch": {
-        "name": "launch",
-        "keys": ["alt", "v", "s", "c"],
-        "cmd": "code"
-      },
-      "shortcuts": []
-    }
-  ]
-}
+```bash
+fiona init
+fiona list
+fiona run
+fiona edit
 ```
 
-## Notes
+Explicit layer commands:
 
-- The listener uses `pynput` for global keyboard capture.
-- The GUI uses `tkinter`, so you can edit app records, launch bindings, shortcuts, and the raw JSON from inside the app.
-- App launch commands run through `bash -lc`, so bindings can use normal shell command strings.
-- Each launch binding or shortcut stores its runnable shell command in `cmd`, alongside editable `name`, `keys`, and `cooldown_seconds` values.
-- `instruction` can store a recorded pointer target like `mouse:1200,420`.
-- `fiona_cmds` can store built-in actions like `mouse-left-click` or `mouse-right-click`.
-- A binding can use any combination of `instruction`, `fiona_cmds`, and `cmd`, but at least one of them must be filled.
-- App-specific shortcuts are matched only when the focused window matches the app's `window_match`, using `xprop`.
-- The default Brave shortcut uses `xdotool key ctrl+l` to focus the URL bar.
-- Global keyboard hooks are OS-dependent. Linux may require X11 support or desktop-specific permissions.
-- The background listener is controlled from the GUI and exposes a visible running/stopped indicator.
-- The current version is an MVP focused on simultaneous app chords, not window switching, fuzzy search, or macro layers.
+```bash
+fiona quiktieper list
+fiona quiktieper run
+fiona quiktieper edit
+```
 
-## Next logical steps
+Current capabilities:
 
-- Fiona Is going to go into advanced terittory later on the inclusion of voice control so this is the base layer built for it.
-- The Fiona Project's name is based on M2 (FNF secret of mimic's fiona)
+- app launching from chord bindings
+- app-specific shortcuts gated by active-window matching
+- shell command execution
+- pointer movement and click helpers
+- allowlisted remote actions for CamComs instructions
+- structured macro instructions with nested steps
+
+Example default bindings:
+
+- `alt + b + r + v` opens Brave
+- `alt + v + s + c` opens VS Code
+- `alt + t + e + r` opens terminal
+
+## CamComs
+
+CamComs is the communication and encryption layer.
+
+Current communication direction:
+
+```text
+ESP32 sender -> encoded encrypted HTTP POST -> Fiona host receiver
+```
+
+Implemented pieces:
+
+- X25519 key agreement
+- HKDF-SHA256 key derivation
+- AES-GCM encrypted payloads
+- Ed25519 sender signatures
+- base64url JSON envelope encoding/decoding
+- trusted sender public-key storage
+- replay protection for duplicate/stale messages
+- host receiver and host service skeleton
+- audit log for accepted/rejected message processing
+- strict JSON instruction validation
+
+Default CamComs storage paths:
+
+```text
+~/.config/fiona/camcoms/host.private.json
+~/.config/fiona/camcoms/host.public.json
+~/.config/fiona/camcoms/esp32.private.json
+~/.config/fiona/camcoms/esp32.public.json
+~/.config/fiona/camcoms/trusted/
+~/.config/fiona/camcoms/audit.log
+```
+
+Useful commands:
+
+```bash
+fiona camcoms smoke-test
+fiona camcoms paths
+fiona camcoms keygen --device-id host
+fiona camcoms keygen --device-id esp32
+fiona camcoms trust --public ~/.config/fiona/camcoms/esp32.public.json
+fiona camcoms trust --list
+fiona camcoms audit
+```
+
+Encrypt a press instruction for the host:
+
+```bash
+fiona camcoms encrypt \
+  --sender-private ~/.config/fiona/camcoms/esp32.private.json \
+  --recipient-public ~/.config/fiona/camcoms/host.public.json \
+  --press alt s
+```
+
+Run the receiver directly:
+
+```bash
+fiona camcoms receive --private ~/.config/fiona/camcoms/host.private.json --port 8080
+```
+
+Host service commands:
+
+```bash
+fiona host init
+fiona host status
+fiona host run
+```
+
+The older nested service commands also exist:
+
+```bash
+fiona camcoms service init
+fiona camcoms service status
+fiona camcoms service run
+```
+
+## Vsee
+
+Vsee is the current holography software layer. It is intentionally simple right now: a point/edge model rendered as a 3D wireframe in the GUI.
+
+Vsee input format:
+
+```csv
+id,x,y,z
+A,-1,-1,-1
+B,1,-1,-1
+```
+
+Edge format:
+
+```csv
+source,target
+A,B
+```
+
+Current capabilities:
+
+- load/edit point and edge tables in the GUI
+- validate duplicate point IDs and missing edge references
+- project 3D coordinates into a 2D canvas using `numpy`
+- parse editable table data using `pandas`
+- render connected wireframe shapes with rotation and scale controls
+
+## Debug Mode
+
+The GUI Debug tab is a restricted project editor. It can view and edit text/code files only under:
+
+```text
+tests/
+scripts/
+QuikTieper/
+CamComs/
+```
+
+It intentionally does not expose the whole filesystem or every project directory. It also skips generated cache directories such as `__pycache__`.
+
+## Wrapper Scripts
+
+Local scripts are available:
+
+```bash
+./scripts/fiona-edit
+./scripts/fiona-run
+```
+
+They are intended to activate the project environment, enter the repo, and launch Fiona.
+
+## Current State
+
+Working today:
+
+- installable Fiona umbrella CLI
+- shared Tkinter GUI
+- QuikTieper binding editor/listener/action runner
+- CamComs encryption/decryption/transport/receiver
+- trusted sender lifecycle and audit logging
+- host service config/status/run commands
+- Vsee point/edge hologram viewer
+- project-restricted GUI debug editor
+- Python tests for the core model/crypto/transport/service/GUI handler paths
+
+Still incomplete:
+
+- no AI agent layer yet
+- ESP32 firmware crypto adapter is still a template, not hardware-verified
+- no ESP32 pairing flow yet
+- no desktop tray/background autostart install yet
+- no voice/speech layer yet
+- no rich notification or spoken feedback layer yet
+- Vsee is currently a wireframe coordinate viewer, not true optical holography
+
+## Validation
+
+Run all current tests:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Compile the main packages:
+
+```bash
+python -m compileall CamComs QuikTieper Vsee fiona
+```
+
+Current latest known result:
+
+```text
+29 tests OK
+compileall OK
+```
