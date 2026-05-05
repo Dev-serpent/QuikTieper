@@ -2,10 +2,25 @@
 
 Fiona is a local host-control project inspired by JARVIS-style workstation control. It is not an AI agent yet. The current project is the software base around that future agent: local actions, encrypted device communication, and a simple 3D hologram viewer.
 
-The installable command is:
+The installed command is intended to be:
 
 ```bash
 fiona
+```
+
+In the current dev setup, use the module form from the repo instead:
+
+```bash
+cd /home/Dhruv/Documents/Projects/Fiona
+python3 -m fiona.cli <command>
+```
+
+Examples:
+
+```bash
+python3 -m fiona.cli edit
+python3 -m fiona.cli list
+python3 -m fiona.cli camcoms smoke-test
 ```
 
 ## Current Architecture
@@ -59,7 +74,8 @@ System/runtime tools used by local control:
 Open the shared GUI:
 
 ```bash
-fiona edit
+cd /home/Dhruv/Documents/Projects/Fiona
+python3 -m fiona.cli edit
 ```
 
 Current panel order:
@@ -90,18 +106,18 @@ Default config path:
 Basic commands:
 
 ```bash
-fiona init
-fiona list
-fiona run
-fiona edit
+python3 -m fiona.cli init
+python3 -m fiona.cli list
+python3 -m fiona.cli run
+python3 -m fiona.cli edit
 ```
 
 Explicit layer commands:
 
 ```bash
-fiona quiktieper list
-fiona quiktieper run
-fiona quiktieper edit
+python3 -m fiona.cli quiktieper list
+python3 -m fiona.cli quiktieper run
+python3 -m fiona.cli quiktieper edit
 ```
 
 Current capabilities:
@@ -156,19 +172,19 @@ Default CamComs storage paths:
 Useful commands:
 
 ```bash
-fiona camcoms smoke-test
-fiona camcoms paths
-fiona camcoms keygen --device-id host
-fiona camcoms keygen --device-id esp32
-fiona camcoms trust --public ~/.config/fiona/camcoms/esp32.public.json
-fiona camcoms trust --list
-fiona camcoms audit
+python3 -m fiona.cli camcoms smoke-test
+python3 -m fiona.cli camcoms paths
+python3 -m fiona.cli camcoms keygen --device-id host
+python3 -m fiona.cli camcoms keygen --device-id esp32
+python3 -m fiona.cli camcoms trust --public ~/.config/fiona/camcoms/esp32.public.json
+python3 -m fiona.cli camcoms trust --list
+python3 -m fiona.cli camcoms audit
 ```
 
 Encrypt a press instruction for the host:
 
 ```bash
-fiona camcoms encrypt \
+python3 -m fiona.cli camcoms encrypt \
   --sender-private ~/.config/fiona/camcoms/esp32.private.json \
   --recipient-public ~/.config/fiona/camcoms/host.public.json \
   --press alt s
@@ -177,23 +193,23 @@ fiona camcoms encrypt \
 Run the receiver directly:
 
 ```bash
-fiona camcoms receive --private ~/.config/fiona/camcoms/host.private.json --port 8080
+python3 -m fiona.cli camcoms receive --private ~/.config/fiona/camcoms/host.private.json --port 8080
 ```
 
 Host service commands:
 
 ```bash
-fiona host init
-fiona host status
-fiona host run
+python3 -m fiona.cli host init
+python3 -m fiona.cli host status
+python3 -m fiona.cli host run
 ```
 
 The older nested service commands also exist:
 
 ```bash
-fiona camcoms service init
-fiona camcoms service status
-fiona camcoms service run
+python3 -m fiona.cli camcoms service init
+python3 -m fiona.cli camcoms service status
+python3 -m fiona.cli camcoms service run
 ```
 
 ## Vsee
