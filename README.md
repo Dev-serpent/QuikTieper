@@ -2,16 +2,16 @@
 
 Fiona is a local host-control project inspired by JARVIS-style workstation control. It is not an AI agent yet. The current project is the software base around that future agent: local actions, encrypted device communication, and a simple 3D hologram viewer.
 
-The installed command is intended to be:
+After installation, the command is:
 
 ```bash
 fiona
 ```
 
-In the current dev setup, use the module form from the repo instead:
+When running from a source checkout before installing the console script, use the module form from the repository root:
 
 ```bash
-cd /home/Dhruv/Documents/Projects/Fiona
+cd Fiona
 python3 -m fiona.cli <command>
 ```
 
@@ -47,12 +47,23 @@ pyproject.toml         package metadata and Python dependencies
 
 ## Install
 
-The intended environment is the `quiktieper` Conda environment:
+Clone the repository, create or activate a Python environment, and install the project in editable mode:
 
 ```bash
-source ~/Applications/miniconda3/etc/profile.d/conda.sh
-conda activate quiktieper
-cd /home/Dhruv/Documents/Projects/Fiona
+git clone <repo-url> Fiona
+cd Fiona
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+Conda works too:
+
+```bash
+conda create -n fiona python=3.13
+conda activate fiona
+git clone <repo-url> Fiona
+cd Fiona
 pip install -e .
 ```
 
@@ -74,8 +85,14 @@ System/runtime tools used by local control:
 Open the shared GUI:
 
 ```bash
-cd /home/Dhruv/Documents/Projects/Fiona
+cd Fiona
 python3 -m fiona.cli edit
+```
+
+If the project is installed and the console script is on `PATH`, this is equivalent:
+
+```bash
+fiona edit
 ```
 
 Current panel order:
@@ -110,6 +127,15 @@ python3 -m fiona.cli init
 python3 -m fiona.cli list
 python3 -m fiona.cli run
 python3 -m fiona.cli edit
+```
+
+Installed-command equivalents:
+
+```bash
+fiona init
+fiona list
+fiona run
+fiona edit
 ```
 
 Explicit layer commands:
