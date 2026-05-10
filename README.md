@@ -2,11 +2,8 @@
 
 Fiona is a local host-control project inspired by JARVIS-style workstation control. It is not an AI agent yet. The current project is the software base around that future agent: local actions, encrypted device communication, and a simple 3D hologram viewer.
 
-After installation, the command is:
-
-```bash
-fiona
-```
+After installation, there is no like direct command present here ,
+you'd have to run it from source
 
 When running from a source checkout before installing the console script, use the module form from the repository root:
 
